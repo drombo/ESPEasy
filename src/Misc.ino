@@ -157,43 +157,6 @@ String flashGuard()
 //use this in function that can return an error string. it automaticly returns with an error string if there where too many flash writes.
 #define FLASH_GUARD() { String flashErr=flashGuard(); if (flashErr.length()) return(flashErr); }
 
-/*********************************************************************************************\
-   Get value count from sensor type
-  \*********************************************************************************************/
-
-byte getValueCountFromSensorType(byte sensorType)
-{
-  byte valueCount = 0;
-
-  switch (sensorType)
-  {
-    case SENSOR_TYPE_SINGLE:                      // single value sensor, used for Dallas, BH1750, etc
-    case SENSOR_TYPE_SWITCH:
-    case SENSOR_TYPE_DIMMER:
-      valueCount = 1;
-      break;
-    case SENSOR_TYPE_LONG:                      // single LONG value, stored in two floats (rfid tags)
-      valueCount = 1;
-      break;
-    case SENSOR_TYPE_TEMP_HUM:
-    case SENSOR_TYPE_TEMP_BARO:
-    case SENSOR_TYPE_DUAL:
-      valueCount = 2;
-      break;
-    case SENSOR_TYPE_TEMP_HUM_BARO:
-    case SENSOR_TYPE_TRIPLE:
-    case SENSOR_TYPE_WIND:
-      valueCount = 3;
-      break;
-    case SENSOR_TYPE_QUAD:
-      valueCount = 4;
-      break;
-  }
-  return valueCount;
-}
-
-
-
 
 /*********************************************************************************************\
    set pin mode & state (info table)
@@ -2857,47 +2820,3 @@ void ArduinoOTAInit()
 }
 
 #endif
-
-String getBearing(int degrees)
-{
-  const __FlashStringHelper* bearing[] = {
-    F("N"),
-    F("NNE"),
-    F("NE"),
-    F("ENE"),
-    F("E"),
-    F("ESE"),
-    F("SE"),
-    F("SSE"),
-    F("S"),
-    F("SSW"),
-    F("SW"),
-    F("WSW"),
-    F("W"),
-    F("WNW"),
-    F("NW"),
-    F("NNW")
-  };
-  int bearing_idx=int(degrees/22.5);
-  if (bearing_idx<0 || bearing_idx>=(int) (sizeof(bearing)/sizeof(bearing[0])))
-    return("");
-  else
-    return(bearing[bearing_idx]);
-
-}
-
-// Compute the dew point temperature, given temperature and humidity (temp in Celcius)
-// Formula: http://www.ajdesigner.com/phphumidity/dewpoint_equation_dewpoint_temperature.php
-// Td = (f/100)^(1/8) * (112 + 0.9*T) + 0.1*T - 112
-float compute_dew_point_temp(float temperature, float humidity_percentage) {
-  return pow(humidity_percentage / 100.0, 0.125) *
-         (112.0 + 0.9*temperature) + 0.1*temperature - 112.0;
-}
-
-// Compute the humidity given temperature and dew point temperature (temp in Celcius)
-// Formula: http://www.ajdesigner.com/phphumidity/dewpoint_equation_relative_humidity.php
-// f = 100 * ((112 - 0.1*T + Td) / (112 + 0.9 * T))^8
-float compute_humidity_from_dewpoint(float temperature, float dew_temperature) {
-  return 100.0 * pow((112.0 - 0.1 * temperature + dew_temperature) /
-                     (112.0 + 0.9 * temperature), 8);
-}
