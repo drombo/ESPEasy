@@ -152,14 +152,14 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 
         if (state == false)
         {
-          unsigned long RotationTime = timePassedSince(Plugin_242_triggerTimePrevious);
-          Plugin_242_triggerTime = RotationTime;
+          unsigned long rotationTime = timePassedSince(Plugin_242_triggerTimePrevious);
+          Plugin_242_triggerTime = rotationTime;
           log = F(" Zeit (ms): ");
-          log += String(RotationTime, 0);
+          log += String(rotationTime, 0);
 
           unsigned long msPerHour = 3600 * 1000;
 
-          UserVar[event->BaseVarIndex + 1] = (float)(msPerHour / RotationTime / 0.075);
+          UserVar[event->BaseVarIndex + 1] = (float)(msPerHour / rotationTime / 0.075);
           Plugin_242_triggerTimePrevious = millis();
 
           // 3600 / gestoppte Durchschnittszeit / 75 U/kWh = aktueller laufender Verbrauch
