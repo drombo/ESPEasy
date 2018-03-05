@@ -12,11 +12,11 @@
 .clang_complete
 .gcc-flags.json
 .piolibdeps
+.vscode
 
 ## Project #####################
 lib/readme.txt
 src/Custom.h
-.vscode/
 .vscode/*.db
 .vscode/c_cpp_properties.json
 .vscode/launch.json
