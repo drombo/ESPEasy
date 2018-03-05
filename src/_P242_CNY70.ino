@@ -121,16 +121,16 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
     Plugin_242_MeasurementCount++;
     Plugin_242_valueSum += Plugin_242_sensorValue;
 
-    debuglog += F("Raw: ");
-    debuglog += Plugin_242_sensorValue;
+    // debuglog += F("Raw: ");
+    // debuglog += Plugin_242_sensorValue;
 
     if (Plugin_242_MeasurementCount >= Plugin_242_avgCounterMax)
-    {
+    { 
 
       float avgValue = (float)(Plugin_242_valueSum / Plugin_242_MeasurementCount);
       UserVar[event->BaseVarIndex + 2] = avgValue;
 
-      boolean state;
+      boolean state = Plugin_242_triggerstate;
 
       // compare with threshold value
       float valueLowThreshold = Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] - (Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] / 2);
@@ -169,7 +169,7 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 
         sendData(event);
       }
-      
+
       // reset Values
       Plugin_242_MeasurementCount = 0;
       Plugin_242_valueSum = 0;
