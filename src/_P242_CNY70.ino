@@ -63,15 +63,10 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 
     case PLUGIN_INIT:
     {
-
-      if (! Settings.TaskDevicePluginConfig[event->TaskIndex][0])
-      {
-        UserVar[event->BaseVarIndex + 2] = 0;
-      }
-
       String log = F("connect IR Led to PIN: ");
       log += Settings.TaskDevicePin1[event->TaskIndex];
       addLog(LOG_LEVEL_INFO, log);
+
       success = true;
       break;
     }
@@ -191,6 +186,7 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 
           UserVar[event->BaseVarIndex + 1] = (float)(msPerHour / rotationTime / 0.075);
           Plugin_242_triggerTimePrevious = millis();
+          saveUserVarToRTC();
 
           // 3600 / gestoppte Durchschnittszeit / 75 U/kWh = aktueller laufender Verbrauch
           log += F(" Verbrauch (WH): ");
@@ -230,7 +226,16 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       log += String(UserVar[event->BaseVarIndex + 1]);
       log += F(" Raw: ");
       log += String(UserVar[event->BaseVarIndex + 2]);
+      log += F(" Time: now(): ");
+      log += now();
+      log += F(" getNtpTime(): ");
+      log += getNtpTime();
+      log += F(" millis(): ");
+      log += millis();
+
       addLog(LOG_LEVEL_INFO, log);
+
+      saveUserVarToRTC();
 
       if( Plugin_242_triggerstate ){
         // reset sum to eleminate value drift
