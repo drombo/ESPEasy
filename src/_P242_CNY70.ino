@@ -18,7 +18,6 @@ float Plugin_242_avgValue = 0;
 uint32_t Plugin_242_avgValuePrevious = 0;        // sum of values to calculate average
 int16_t Plugin_242_cumulativeSum = 0;
 
-unsigned long Plugin_242_triggerTime;
 unsigned long Plugin_242_triggerTimePrevious;
 
 uint8_t Plugin_242_avgCounterMax = 10;
@@ -66,6 +65,8 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       String log = F("connect IR Led to PIN: ");
       log += Settings.TaskDevicePin1[event->TaskIndex];
       addLog(LOG_LEVEL_INFO, log);
+
+      Plugin_242_triggerTimePrevious = UserVar[event->BaseVarIndex + 3];
 
       success = true;
       break;
@@ -154,6 +155,9 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       log += F(" Cumulative Sum: ");
       log += Plugin_242_cumulativeSum;
 
+      log += F(" triggerTimePrevious: ");
+      log += Plugin_242_triggerTimePrevious;
+
 
       boolean state = Plugin_242_triggerstate;
 
@@ -177,15 +181,26 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 
         if (state == false)
         {
-          unsigned long rotationTime = timePassedSince(Plugin_242_triggerTimePrevious);
-          Plugin_242_triggerTime = rotationTime;
+          unsigned long currentTriggerTime = millis();
+
+          if (Settings.UseNTP){
+            currentTriggerTime = getNtpTime();
+          }
+
+          long rotationTime = timeDiff(Plugin_242_triggerTimePrevious, currentTriggerTime);
+
           log += F(" Zeit (ms): ");
           log += rotationTime;
 
-          unsigned long msPerHour = 3600 * 1000;
+          //unsigned long msPerHour = 3600 * 1000;
 
-          UserVar[event->BaseVarIndex + 1] = (float)(msPerHour / rotationTime / 0.075);
-          Plugin_242_triggerTimePrevious = millis();
+          if (rotationTime > 0 ) {
+            UserVar[event->BaseVarIndex + 1] = (float)(SECS_PER_HOUR / rotationTime / 0.075);
+          }
+
+          UserVar[event->BaseVarIndex + 3] = Plugin_242_triggerTimePrevious = currentTriggerTime;
+           
+
           saveUserVarToRTC();
 
           // 3600 / gestoppte Durchschnittszeit / 75 U/kWh = aktueller laufender Verbrauch
@@ -226,12 +241,6 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       log += String(UserVar[event->BaseVarIndex + 1]);
       log += F(" Raw: ");
       log += String(UserVar[event->BaseVarIndex + 2]);
-      log += F(" Time: now(): ");
-      log += now();
-      log += F(" getNtpTime(): ");
-      log += getNtpTime();
-      log += F(" millis(): ");
-      log += millis();
 
       addLog(LOG_LEVEL_INFO, log);
 
