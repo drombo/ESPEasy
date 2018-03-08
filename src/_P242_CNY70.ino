@@ -148,13 +148,12 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 
       Plugin_242_cumulativeSum += difference;
 
-      log += F("Avg: ");
+      log += F("Average value: ");
       log += Plugin_242_avgValue;
       log += F(" Difference: ");
       log += difference;
-      log += F(" Cumulative Sum: ");
+      log += F(" Cumulative sum: ");
       log += Plugin_242_cumulativeSum;
-
       log += F(" triggerTimePrevious: ");
       log += Plugin_242_triggerTimePrevious;
 
@@ -184,15 +183,13 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
           unsigned long currentTriggerTime = millis();
 
           if (Settings.UseNTP){
-            currentTriggerTime = getNtpTime();
+            currentTriggerTime = now();
           }
 
           long rotationTime = timeDiff(Plugin_242_triggerTimePrevious, currentTriggerTime);
 
-          log += F(" Zeit (ms): ");
+          log += F(" Time per revolution (s): ");
           log += rotationTime;
-
-          //unsigned long msPerHour = 3600 * 1000;
 
           if (rotationTime > 0 ) {
             UserVar[event->BaseVarIndex + 1] = (float)(SECS_PER_HOUR / rotationTime / 0.075);
@@ -204,7 +201,7 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
           saveUserVarToRTC();
 
           // 3600 / gestoppte Durchschnittszeit / 75 U/kWh = aktueller laufender Verbrauch
-          log += F(" Verbrauch (WH): ");
+          log += F(" Consumption (WH): ");
           log += UserVar[event->BaseVarIndex + 1];
         } 
         else 
