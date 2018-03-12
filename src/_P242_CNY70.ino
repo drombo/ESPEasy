@@ -2,6 +2,12 @@
 //#################################### Plugin 242: CNY70  ###############################################
 //#######################################################################################################
 
+// ToDo: set message delay 
+// warnung, falls kein ntp genutzt wird
+// Umdrehungen pro kWH konfigurierbar
+// Zählerstand incl. counter
+// Pin für Status LED
+
 //#ifdef PLUGIN_BUILD_TESTING
 
 #define PLUGIN_242
@@ -11,18 +17,14 @@
 #define PLUGIN_VALUENAME2_242 "Consumption"
 #define PLUGIN_VALUENAME3_242 "Raw"
 
-uint8_t Plugin_242_MeasurementCount = 0; // counter for measurements to calculate average
-uint32_t Plugin_242_valueSum = 0;        // sum of values to calculate average
-float Plugin_242_avgValue = 0;
+byte Plugin_242_MeasurementCount = 0;  // counter for measurements to calculate average
+unsigned long Plugin_242_valueSum = 0; // sum of values to calculate average
+float Plugin_242_avgValue = 0;         // store calculated average
+float Plugin_242_avgValuePrevious = 0; // previous average to calculate difference
+int Plugin_242_cumulativeSum = 0;      // sum of differences
+unsigned long Plugin_242_triggerTimePrevious; // timestamp of previous trigger
+boolean Plugin_242_triggerstate; // hold the state of the trigger
 
-uint32_t Plugin_242_avgValuePrevious = 0;        // sum of values to calculate average
-int16_t Plugin_242_cumulativeSum = 0;
-
-unsigned long Plugin_242_triggerTimePrevious;
-
-uint8_t Plugin_242_avgCounterMax = 10;
-
-boolean Plugin_242_triggerstate;
 
 boolean Plugin_242(byte function, struct EventStruct *event, String &string)
 {
@@ -56,17 +58,24 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
     {
       strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[0], PSTR(PLUGIN_VALUENAME1_242));
       strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[1], PSTR(PLUGIN_VALUENAME2_242));
-      strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[1], PSTR(PLUGIN_VALUENAME3_242));
+      strcpy_P(ExtraTaskSettings.TaskDeviceValueNames[2], PSTR(PLUGIN_VALUENAME3_242));
       break;
     }
 
     case PLUGIN_INIT:
     {
-      String log = F("connect IR Led to PIN: ");
+      String log = F("IR Led pin is: ");
       log += Settings.TaskDevicePin1[event->TaskIndex];
       addLog(LOG_LEVEL_INFO, log);
 
+      // get old value after reboot
       Plugin_242_triggerTimePrevious = UserVar[event->BaseVarIndex + 3];
+
+      // set IR LED pin as output
+      pinMode(Settings.TaskDevicePin1[event->TaskIndex], OUTPUT);
+
+      Plugin_242_avgValue = 0;
+      Plugin_242_cumulativeSum = 0;
 
       success = true;
       break;
@@ -75,8 +84,8 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
     case PLUGIN_WEBFORM_LOAD:
     {
 
-      addFormCheckBox(string, F("Send raw data"), F("plugin_242_sendraw"), Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
-      addFormNote(string, F("on for calibration"));
+      addFormCheckBox(string, F("Send every value"), F("plugin_242_sendraw"), Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
+      addFormNote(string, F("only for calibration (will cause frequent reboots)"));
 
       addFormTextBox(string, F("Trigger Level"), F("plugin_242_triggerlevel"), String(Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0]), 8);
 
@@ -105,21 +114,22 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       // wait 10 milliseconds
       delay(10);
       // read the analog in value:
-      int16_t Plugin_242_sensorValueOff = analogRead(A0);
+      int Plugin_242_sensorValueOff = analogRead(A0);
 
       // turn IR LED back on
       digitalWrite(Settings.TaskDevicePin1[event->TaskIndex], HIGH);
       delay(10);
       // read the analog in value:
-      int16_t Plugin_242_sensorValueOn = analogRead(A0);
+      int Plugin_242_sensorValueOn = analogRead(A0);
 
       // calculate difference
-      int16_t Plugin_242_sensorValue = Plugin_242_sensorValueOff - Plugin_242_sensorValueOn;
+      int Plugin_242_sensorValue = Plugin_242_sensorValueOff - Plugin_242_sensorValueOn;
 
       // build sums for average calculation
       Plugin_242_MeasurementCount++;
       Plugin_242_valueSum += Plugin_242_sensorValue;
 
+      // calculate average
       Plugin_242_avgValue = (float)(Plugin_242_valueSum / Plugin_242_MeasurementCount);
 
       debuglog += F("Raw Value: ");
@@ -137,15 +147,18 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
     {
       String log = F("");
 
+      // get average over 100ms measuerments
       UserVar[event->BaseVarIndex + 2] = Plugin_242_avgValue;
 
-      int16_t difference = 0;
+      /*
+      / Remove value drift by building the difference to the previous value.
+      / Then build the sum. This give better results if the edge is not sharp enough.
+      */
 
-      // Previous value is 0 after init. Do not use this value for calculation.
-      if(Plugin_242_avgValuePrevious != 0){
-        difference = Plugin_242_avgValue - Plugin_242_avgValuePrevious;
-      }
+      // calculate differrence
+      int difference = Plugin_242_avgValue - Plugin_242_avgValuePrevious;
 
+      // build sum over all differences
       Plugin_242_cumulativeSum += difference;
 
       log += F("Average value: ");
@@ -157,10 +170,10 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       log += F(" triggerTimePrevious: ");
       log += Plugin_242_triggerTimePrevious;
 
-
+      // store current trigger state
       boolean state = Plugin_242_triggerstate;
 
-      // compare with threshold value
+      // compare the sum with threshold value
       float valueLowThreshold = Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] - (Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] / 2);
       float valueHighThreshold = Settings.TaskDevicePluginConfigFloat[event->TaskIndex][0] + (Settings.TaskDevicePluginConfigFloat[event->TaskIndex][1] / 2);
       if (Plugin_242_cumulativeSum <= valueLowThreshold)
@@ -168,39 +181,47 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
       if (Plugin_242_cumulativeSum >= valueHighThreshold)
       state = true;
 
-      // if value changed
+      // if trigger value has switched
       if (state != Plugin_242_triggerstate)
       {
+        // save new trigger state
         Plugin_242_triggerstate = state;
-        //statusLED(true);
         UserVar[event->BaseVarIndex] = state ? 1 : 0;
 
-        log += F(" Trigger changed state: ");
+        statusLED(state);
+
+        log += F(" Trigger has changed state: ");
         log += String(UserVar[event->BaseVarIndex], 0);
 
+        // calculate consumption on the negative edge
         if (state == false)
         {
-          unsigned long currentTriggerTime = millis();
+          // save current timestamp (in seconds)
+          unsigned long currentTriggerTime = millis()/1000;
 
+          // better use NTP, then give this timestamp
           if (Settings.UseNTP){
             currentTriggerTime = now();
           }
 
+          // calculate the time per revolution
           long rotationTime = timeDiff(Plugin_242_triggerTimePrevious, currentTriggerTime);
 
           log += F(" Time per revolution (s): ");
           log += rotationTime;
 
+          // calculate consumption (75r/kWH)
+          // [3600 (sec/h) / Zeit pro Umdrehung (s) / 75 U/kWh = aktueller laufender Verbrauch]
           if (rotationTime > 0 ) {
             UserVar[event->BaseVarIndex + 1] = (float)(SECS_PER_HOUR / rotationTime / 0.075);
           }
 
+          // save trigger timestamp
           UserVar[event->BaseVarIndex + 3] = Plugin_242_triggerTimePrevious = currentTriggerTime;
            
-
+          // save values to RTC to persist over reboot
           saveUserVarToRTC();
 
-          // 3600 / gestoppte Durchschnittszeit / 75 U/kWh = aktueller laufender Verbrauch
           log += F(" Consumption (WH): ");
           log += UserVar[event->BaseVarIndex + 1];
         } 
@@ -213,7 +234,7 @@ boolean Plugin_242(byte function, struct EventStruct *event, String &string)
         sendData(event);
       }
 
-      // reset Values
+      // reset and save values
       Plugin_242_avgValuePrevious = Plugin_242_avgValue;
       Plugin_242_MeasurementCount = 0;
       Plugin_242_valueSum = 0;
