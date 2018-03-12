@@ -2,7 +2,6 @@
 //#################################### Plugin 242: CNY70  ###############################################
 //#######################################################################################################
 
-// ToDo: set message delay 
 // warnung, falls kein ntp genutzt wird
 // Umdrehungen pro kWH konfigurierbar
 // Zählerstand incl. counter
